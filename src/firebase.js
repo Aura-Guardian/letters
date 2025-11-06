@@ -4,17 +4,17 @@ import {
   getFirestore,
   collection,
   addDoc,
-  getDocs,
-  query,
-  orderBy,
-  serverTimestamp,
-  doc,
   updateDoc,
   deleteDoc,
+  doc,
   onSnapshot,
+  query,
+  orderBy,
   where,
+  serverTimestamp,
 } from "firebase/firestore";
 
+// ---- your config (unchanged) ----
 const firebaseConfig = {
   apiKey: "AIzaSyDrjoPKmmHSfmbUCQaBo0y0KWvK5aZWyVo",
   authDomain: "letters-cffb8.firebaseapp.com",
@@ -24,95 +24,75 @@ const firebaseConfig = {
   appId: "1:29545574327:web:ba61307069f10fbf794232",
 };
 
-// init firebase app
 const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
 
-// init firestore
-const db = getFirestore(app);
-
-/* ---- helper wrappers we’ll import in App.jsx ---- */
-
-// listen to all letters (live)
-export function listenToLetters(callback) {
-  // we'll order so newest first (by createdAt, desc)
+// ---------- LETTERS ----------
+export function listenToLetters(callback, onError) {
   const qLetters = query(
     collection(db, "letters"),
-    orderBy("createdAt", "desc")
+    orderBy("createdAt", "desc") // safe without composite indexes
   );
-
-  return onSnapshot(qLetters, (snapshot) => {
-    const data = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }));
-    callback(data);
-  });
+  return onSnapshot(
+    qLetters,
+    (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      callback(rows);
+    },
+    (err) => onError?.(err)
+  );
 }
 
-// add a letter
-export async function createLetter({ title, date, body, favorite = false }) {
-  const ref = await addDoc(collection(db, "letters"), {
-    title,
-    date,
-    body,
-    favorite,
-    deleted: false,
+export async function addLetter({ title, date, body }) {
+  const col = collection(db, "letters");
+  await addDoc(col, {
+    title: title.trim(),
+    date: (date || "").trim() || new Date().toISOString().slice(0, 10),
+    body: body.trim(),
+    favorite: false,
     createdAt: serverTimestamp(),
   });
-  return ref.id;
 }
 
-// update an existing letter
 export async function updateLetter(id, updates) {
   const ref = doc(db, "letters", id);
   await updateDoc(ref, updates);
 }
 
-// soft-delete a letter (mark deleted=true)
-export async function trashLetter(id) {
+export async function toggleFavorite(id, current) {
   const ref = doc(db, "letters", id);
-  await updateDoc(ref, { deleted: true });
+  await updateDoc(ref, { favorite: !current });
 }
 
-// restore / un-delete
-export async function restoreLetterFromTrash(id) {
-  const ref = doc(db, "letters", id);
-  await updateDoc(ref, { deleted: false });
-}
-
-// PERMANENT delete (if we ever add it)
-export async function hardDeleteLetter(id) {
+export async function deleteLetter(id) {
   const ref = doc(db, "letters", id);
   await deleteDoc(ref);
 }
 
-/* ----- comments ----- */
-
-// listen to comments for a specific letter
-export function listenToComments(letterId, callback) {
-  const qComments = query(
-    collection(db, "comments"),
-    where("letterId", "==", letterId),
-    orderBy("createdAt", "asc")
-  );
-
-  return onSnapshot(qComments, (snapshot) => {
-    const data = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }));
-    callback(data);
-  });
-}
-
-// add a comment
+// ---------- COMMENTS ----------
 export async function createComment({ letterId, author, text }) {
-  await addDoc(collection(db, "comments"), {
+  const col = collection(db, "comments");
+  await addDoc(col, {
     letterId,
-    author, // e.g. "me" / "you"
-    text,
+    author: author?.trim() || "someone",
+    text: text.trim(),
     createdAt: serverTimestamp(),
   });
 }
 
-export { db };
+export function listenToComments(letterId, callback, onError) {
+  const q = query(collection(db, "comments"), where("letterId", "==", letterId));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => {
+        const ta = a.createdAt?.toMillis?.() ?? 0;
+        const tb = b.createdAt?.toMillis?.() ?? 0;
+        return ta - tb;
+      });
+      callback(rows);
+    },
+    (err) => onError?.(err)
+  );
+}
