@@ -381,7 +381,7 @@ export default function App() {
               placeholder="do you remember?"
             />
 
-            <label className="block text-xs text-[#3b2f2f]/70 mb-1">date (optional)</label>
+            <label className="block text-xs text-[#3b2f2f]/70 mb-1">date</label>
             <input
               className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
               value={newDate}
@@ -548,7 +548,7 @@ export default function App() {
               <div className="flex flex-col gap-2">
                 <input
                   className="bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm"
-                  placeholder="your name (optional)"
+                  placeholder="your name"
                   value={newCommentAuthor}
                   onChange={(e) => setNewCommentAuthor(e.target.value)}
                 />
