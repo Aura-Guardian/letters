@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
-import { auth } from "./firebase"; // Import auth from our updated file
+import { auth } from "./firebase"; 
 import {
   listenToLetters,
   addLetter as addLetterDB,
@@ -59,6 +59,8 @@ function SoftClouds() {
 
 /* ----- Letter Card ----- */
 function LetterCard({ letter, onOpen, onToggleFavorite }) {
+  if (!letter) return null; // Safety check
+  
   return (
     <div
       onClick={() => onOpen(letter)}
@@ -89,9 +91,9 @@ function LetterCard({ letter, onOpen, onToggleFavorite }) {
       </button>
       <div className="pr-8">
         <div className="text-[1.05rem] font-semibold leading-snug text-[#3b2f2f]">
-          {letter.title}
+          {letter.title || "Untitled"}
         </div>
-        <div className="text-[0.7rem] text-[#3b2f2f]/60 mb-2">{letter.date}</div>
+        <div className="text-[0.7rem] text-[#3b2f2f]/60 mb-2">{letter.date || ""}</div>
         <div className="text-sm leading-relaxed text-[#3b2f2f]/90 whitespace-pre-line">
           {getPreview(letter.body)}
         </div>
@@ -102,7 +104,7 @@ function LetterCard({ letter, onOpen, onToggleFavorite }) {
 }
 
 /* ----- LOGIN COMPONENT ----- */
-function LoginScreen() {
+function LoginScreen({ onLogin }) { // Helper component logic moved inside
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -147,22 +149,13 @@ function LoginScreen() {
   );
 }
 
-
 /* ----- MAIN APP ----- */
 export default function App() {
+  // 1. ALL HOOKS MUST BE DECLARED AT THE TOP
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // AUTH STATE LISTENER
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-    });
-    return () => unsub();
-  }, []);
-
-  // letters (live from Firestore)
+  // letters
   const [letters, setLetters] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -175,27 +168,36 @@ export default function App() {
   const [newDate, setNewDate] = useState("");
   const [newBody, setNewBody] = useState("");
 
-  // modal + editing
+  // modal
   const [openLetter, setOpenLetter] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editBody, setEditBody] = useState("");
   const [typedText, setTypedText] = useState("");
-  const typingIntervalRef = useRef(null);
-
+  
   // comments
   const [comments, setComments] = useState([]);
   const [newCommentAuthor, setNewCommentAuthor] = useState("");
   const [newCommentText, setNewCommentText] = useState("");
+  
+  const typingIntervalRef = useRef(null);
   const commentsUnsubRef = useRef(null);
 
-  // trash panel
-  const [showTrashPanel] = useState(false);
+  // --- USE EFFECTS ---
 
-  // subscribe letters ONLY if user is logged in
+  // Auth Listener
   useEffect(() => {
-    if (!user) return; // Do not fetch if not logged in
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Letters Listener (only runs if user exists)
+  useEffect(() => {
+    if (!user) return; 
 
     const unsub = listenToLetters(
       (rows) => {
@@ -208,24 +210,41 @@ export default function App() {
       }
     );
     return () => unsub();
-  }, [user]); // Re-run when user logs in
+  }, [user]);
 
-  // --- RENDERING LOGIC ---
-  if (authLoading) return <div className="min-h-screen bg-[#fdf6ec]" />;
-  if (!user) return <LoginScreen />;
+  // Typewriter effect (MOVED UP HERE so it's not after a return)
+  useEffect(() => {
+    if (!openLetter || isEditing) return;
+    if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+    const full = openLetter.body || "";
+    let i = 0;
+    typingIntervalRef.current = setInterval(() => {
+      i += 1;
+      setTypedText(full.slice(0, i));
+      if (i >= full.length) clearInterval(typingIntervalRef.current);
+    }, 15);
+    return () => typingIntervalRef.current && clearInterval(typingIntervalRef.current);
+  }, [openLetter, isEditing]);
+
+
+  // --- HELPER FUNCTIONS ---
 
   // filter
   const filteredLetters = letters.filter((l) => {
+    if (!l) return false;
     const q = search.toLowerCase();
+    const title = l.title || "";
+    const date = l.date || "";
+    const body = l.body || "";
+    
     const matches =
-      l.title.toLowerCase().includes(q) ||
-      (l.date || "").toLowerCase().includes(q) ||
-      l.body.toLowerCase().includes(q);
+      title.toLowerCase().includes(q) ||
+      date.toLowerCase().includes(q) ||
+      body.toLowerCase().includes(q);
     const fav = showOnlyFavorites ? l.favorite : true;
     return matches && fav;
   });
 
-  // actions
   async function addLetter() {
     if (!newTitle.trim() || !newBody.trim()) return;
     await addLetterDB({ title: newTitle, date: newDate, body: newBody });
@@ -294,25 +313,11 @@ export default function App() {
     closeModal();
   }
 
-  // typewriter effect
-  useEffect(() => {
-    if (!openLetter || isEditing) return;
-    if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
-    const full = openLetter.body || "";
-    let i = 0;
-    typingIntervalRef.current = setInterval(() => {
-      i += 1;
-      setTypedText(full.slice(0, i));
-      if (i >= full.length) clearInterval(typingIntervalRef.current);
-    }, 15);
-    return () => typingIntervalRef.current && clearInterval(typingIntervalRef.current);
-  }, [openLetter, isEditing]);
-
   async function handleAddComment() {
     if (!openLetter || !newCommentText.trim()) return;
     try {
       await createComment({
-        letterId: openLetter.id, // Firestore doc id
+        letterId: openLetter.id,
         author: newCommentAuthor,
         text: newCommentText,
       });
@@ -322,6 +327,11 @@ export default function App() {
       alert("Could not add comment. Please try again.");
     }
   }
+
+  // --- RENDERING ---
+  // Returns happen LAST
+  if (authLoading) return <div className="min-h-screen bg-[#fdf6ec]" />;
+  if (!user) return <LoginScreen />;
 
   return (
     <div
@@ -378,8 +388,8 @@ export default function App() {
               </button>
             </div>
 
-            {/* restore toggle kept for layout; hidden when not used */}
-            {showTrashPanel && <div />}
+            {/* trash panel restored toggle */}
+            <div className="hidden" />
 
             <div className="flex flex-col items-start text-left opacity-50 cursor-not-allowed">
               <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">typing sound</label>
