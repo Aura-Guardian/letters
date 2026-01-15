@@ -1,5 +1,6 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth"; // Import Auth
 import {
   getFirestore,
   collection,
@@ -14,7 +15,6 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-// ---- your config (unchanged) ----
 const firebaseConfig = {
   apiKey: "AIzaSyDrjoPKmmHSfmbUCQaBo0y0KWvK5aZWyVo",
   authDomain: "letters-cffb8.firebaseapp.com",
@@ -26,12 +26,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app); // Export Auth
 
 // ---------- LETTERS ----------
 export function listenToLetters(callback, onError) {
   const qLetters = query(
     collection(db, "letters"),
-    orderBy("createdAt", "desc") // safe without composite indexes
+    orderBy("createdAt", "desc")
   );
   return onSnapshot(
     qLetters,
