@@ -1,11 +1,10 @@
-// src/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth"; 
 import {
   getFirestore,
   collection,
   addDoc,
-  updateDoc,
+  updateDoc, // Make sure this is imported
   deleteDoc,
   doc,
   onSnapshot,
@@ -66,7 +65,7 @@ export async function deleteLetter(id) {
   await deleteDoc(doc(db, "letters", id));
 }
 
-// ---------- OPEN WHEN (NEW) ----------
+// ---------- OPEN WHEN ----------
 export function listenToOpenWhen(callback, onError) {
   const q = query(collection(db, "open_when"), orderBy("createdAt", "desc"));
   return onSnapshot(
@@ -82,6 +81,11 @@ export async function addOpenWhen({ title, body }) {
     body: body.trim(),
     createdAt: serverTimestamp(),
   });
+}
+
+// *** NEW FUNCTION HERE ***
+export async function updateOpenWhen(id, updates) {
+  await updateDoc(doc(db, "open_when", id), updates);
 }
 
 export async function deleteOpenWhen(id) {
