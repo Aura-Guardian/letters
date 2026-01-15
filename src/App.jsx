@@ -9,6 +9,7 @@ import {
   toggleFavorite as toggleFavoriteDB,
   listenToOpenWhen,
   addOpenWhen as addOpenWhenDB,
+  updateOpenWhen as updateOpenWhenDB, // Import the new function
   deleteOpenWhen as deleteOpenWhenDB,
   createComment,
   listenToComments,
@@ -45,6 +46,7 @@ function SoftClouds() {
         <div className="absolute top-10 -left-10 w-64 h-64 rounded-full bg-[rgba(70,70,70,0.08)] blur-[60px]" />
         <div className="absolute -bottom-24 -right-16 w-80 h-80 rounded-full bg-[rgba(80,80,80,0.15)] blur-[55px]" />
         <div className="absolute bottom-10 right-24 w-64 h-64 rounded-full bg-[rgba(60,60,60,0.10)] blur-[60px]" />
+        <div className="absolute bottom-28 right-10 w-48 h-48 rounded-full bg-[rgba(40,40,40,0.07)] blur-[70px]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] rounded-full bg-[rgba(50,50,50,0.07)] blur-[80px]" />
       </div>
       <div
@@ -114,7 +116,6 @@ function EnvelopeCard({ letter, onOpen }) {
           backgroundColor: "rgba(255,255,255,0.4)"
         }}
       />
-      {/* Borders for flap definition */}
       <div className="absolute top-0 left-0 w-full h-[55%] border-b border-[#b69f83]/30" 
            style={{ clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
 
@@ -123,7 +124,8 @@ function EnvelopeCard({ letter, onOpen }) {
         ♥
       </div>
 
-      <div className="z-20 px-6 pt-6 text-center">
+      {/* Title - Pushed down with pt-12 to avoid overlap with seal */}
+      <div className="z-20 px-6 pt-12 text-center">
         <h3 className="text-[#3b2f2f] font-handwritten text-xl font-bold leading-tight group-hover:scale-105 transition-transform">
           {letter.title}
         </h3>
@@ -300,8 +302,8 @@ export default function App() {
     setNewCommentAuthor("");
     setNewCommentText("");
 
-    // Only fetch comments if it has an ID (persisted letter)
-    if (letter.id) {
+    // Only fetch comments if it has an ID and is a Letter (has date)
+    if (letter.id && letter.date !== undefined) {
         if (commentsUnsubRef.current) commentsUnsubRef.current();
         commentsUnsubRef.current = listenToComments(
         letter.id,
@@ -324,18 +326,21 @@ export default function App() {
 
   async function saveEdits() {
     if (!openLetter) return;
-    // We only support editing "Letters" fully for now to keep it simple
+    
+    const updates = {
+        title: editTitle.trim() || "(untitled)",
+        body: editBody.trim(),
+    };
+
     if (openLetter.date !== undefined) {
-        const updates = {
-            title: editTitle.trim() || "(untitled)",
-            date: (editDate || "").trim(),
-            body: editBody.trim(),
-        };
+        // It's a regular letter
+        updates.date = (editDate || "").trim();
         await updateLetterDB(openLetter.id, updates);
-        setOpenLetter({ ...openLetter, ...updates });
     } else {
-        alert("Editing Open When envelopes is not implemented yet. Delete and recreate if needed.");
+        // It's an Open When envelope
+        await updateOpenWhenDB(openLetter.id, updates);
     }
+    setOpenLetter({ ...openLetter, ...updates });
     setIsEditing(false);
     setTypedText("");
   }
@@ -376,7 +381,7 @@ export default function App() {
         <header className="w-full max-w-5xl mx-auto px-4 py-6 flex flex-col gap-6 text-center">
           <div className="flex flex-col items-center">
             <div className="text-2xl font-semibold text-[#3b2f2f] leading-none font-handwritten">
-              written with ink and heart ♡
+              .✦ ݁˖⟡˙⋆ written with ink and soul ⋆˙⟡˖ ݁✦.
             </div>
             
             <div className="flex gap-4 mt-6 text-sm font-medium">
@@ -439,7 +444,7 @@ export default function App() {
                         className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm focus:outline-none"
                         value={newTitle}
                         onChange={(e) => setNewTitle(e.target.value)}
-                        placeholder={view === "letters" ? "do you remember?" : "e.g. you're sad"}
+                        placeholder={view === "letters" ? "do you remember?" : "e.g. you're feeling..."}
                     />
 
                     {view === "letters" && (
@@ -455,13 +460,13 @@ export default function App() {
                     )}
 
                     <label className="block text-xs text-[#3b2f2f]/70 mb-1">
-                        {view === "letters" ? "body" : "content inside"}
+                        {view === "letters" ? "body" : "content"}
                     </label>
                     <textarea
                         className="w-full h-32 resize-none mb-4 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm leading-relaxed focus:outline-none"
                         value={newBody}
                         onChange={(e) => setNewBody(e.target.value)}
-                        placeholder="write like always..."
+                        placeholder="write here!"
                     />
 
                     <button
@@ -498,7 +503,7 @@ export default function App() {
               <div className="flex items-center gap-2">
                 {!isEditing ? (
                   <>
-                    {openLetter.date !== undefined && <button onClick={() => { setIsEditing(true); setTypedText(""); }} className="px-3 py-1 rounded bg-[#fdf6ec] border border-[#b69f83]/50 text-sm shadow">edit</button>}
+                    <button onClick={() => { setIsEditing(true); setTypedText(""); }} className="px-3 py-1 rounded bg-[#fdf6ec] border border-[#b69f83]/50 text-sm shadow">edit</button>
                     <button onClick={removeLetter} className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-sm shadow">delete</button>
                   </>
                 ) : (
@@ -523,24 +528,26 @@ export default function App() {
               )}
             </div>
 
-            {/* Comments */}
-            <div className="border-t border-[rgba(182,159,131,0.3)] px-5 py-3">
-              <div className="text-[0.75rem] text-[#3b2f2f]/70 mb-2">notes back to this letter:</div>
-              <ul className="space-y-2 mb-3 max-h-40 overflow-y-auto pr-1">
-                  {comments.map((c) => (
-                    <li key={c.id} className="text-sm">
-                      <span className="font-semibold">{c.author || "someone"}</span> <span className="text-[#3b2f2f]/70">—</span> {c.text}
-                    </li>
-                  ))}
-              </ul>
-              <div className="flex flex-col gap-2">
-                <input className="bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm" placeholder="your name" value={newCommentAuthor} onChange={(e) => setNewCommentAuthor(e.target.value)} />
-                <div className="flex gap-2">
-                  <input className="flex-1 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm" placeholder="write back..." value={newCommentText} onChange={(e) => setNewCommentText(e.target.value)} />
-                  <button onClick={handleAddComment} className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-xs shadow">add</button>
+            {/* Comments: HIDDEN for Envelopes (no date) */}
+            {openLetter.date !== undefined && (
+                <div className="border-t border-[rgba(182,159,131,0.3)] px-5 py-3">
+                <div className="text-[0.75rem] text-[#3b2f2f]/70 mb-2">notes back to this letter:</div>
+                <ul className="space-y-2 mb-3 max-h-40 overflow-y-auto pr-1">
+                    {comments.map((c) => (
+                        <li key={c.id} className="text-sm">
+                        <span className="font-semibold">{c.author || "someone"}</span> <span className="text-[#3b2f2f]/70">—</span> {c.text}
+                        </li>
+                    ))}
+                </ul>
+                <div className="flex flex-col gap-2">
+                    <input className="bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm" placeholder="your name" value={newCommentAuthor} onChange={(e) => setNewCommentAuthor(e.target.value)} />
+                    <div className="flex gap-2">
+                    <input className="flex-1 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm" placeholder="reply back..." value={newCommentText} onChange={(e) => setNewCommentText(e.target.value)} />
+                    <button onClick={handleAddComment} className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-xs shadow">add</button>
+                    </div>
                 </div>
-              </div>
-            </div>
+                </div>
+            )}
           </div>
         </div>
       )}
