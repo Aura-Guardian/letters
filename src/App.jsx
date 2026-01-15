@@ -9,7 +9,7 @@ import {
   toggleFavorite as toggleFavoriteDB,
   listenToOpenWhen,
   addOpenWhen as addOpenWhenDB,
-  updateOpenWhen as updateOpenWhenDB, // Import the new function
+  updateOpenWhen as updateOpenWhenDB,
   deleteOpenWhen as deleteOpenWhenDB,
   createComment,
   listenToComments,
@@ -102,29 +102,32 @@ function EnvelopeCard({ letter, onOpen }) {
   return (
     <div 
       onClick={() => onOpen(letter)}
-      className="group relative cursor-pointer w-full max-w-[280px] h-36 bg-[#fdf6ec] border border-[#b69f83] shadow-md hover:shadow-xl transition-all flex items-center justify-center rounded-sm"
+      className="group relative cursor-pointer w-full max-w-[280px] h-36 border border-[#dcd0ff] shadow-md hover:shadow-xl transition-all flex items-center justify-center rounded-sm"
       style={{
-        backgroundImage: "repeating-linear-gradient(45deg, #fdf6ec 0, #fdf6ec 10px, #fffdf9 10px, #fffdf9 20px)"
+        // Lavender Base + Canvas Texture
+        backgroundColor: "#f3e6f5",
+        backgroundImage: `linear-gradient(90deg, rgba(59, 47, 47, 0.03) 50%, transparent 50%), linear-gradient(rgba(59, 47, 47, 0.03) 50%, transparent 50%)`,
+        backgroundSize: "4px 4px"
       }}
     >
       {/* Top Flap Triangle */}
       <div 
         className="absolute top-0 left-0 w-full h-full pointer-events-none"
         style={{
-          background: "linear-gradient(to bottom right, transparent 50%, rgba(182,159,131,0.1) 50%), linear-gradient(to bottom left, transparent 50%, rgba(182,159,131,0.1) 50%)",
+          background: "linear-gradient(to bottom right, transparent 50%, rgba(100, 80, 100, 0.05) 50%), linear-gradient(to bottom left, transparent 50%, rgba(100, 80, 100, 0.05) 50%)",
           clipPath: "polygon(0 0, 100% 0, 50% 55%)",
-          backgroundColor: "rgba(255,255,255,0.4)"
+          backgroundColor: "rgba(255,255,255,0.3)"
         }}
       />
       <div className="absolute top-0 left-0 w-full h-[55%] border-b border-[#b69f83]/30" 
            style={{ clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
 
-      {/* Wax Seal */}
-      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-red-800/80 rounded-full shadow-sm flex items-center justify-center text-white/90 text-xs border border-red-900">
+      {/* Wax Seal - Deep Plum */}
+      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-[#6a4f6b] rounded-full shadow-sm flex items-center justify-center text-white/90 text-xs border border-[#4a3f4b]">
         ♥
       </div>
 
-      {/* Title - Pushed down with pt-12 to avoid overlap with seal */}
+      {/* Title */}
       <div className="z-20 px-6 pt-12 text-center">
         <h3 className="text-[#3b2f2f] font-handwritten text-xl font-bold leading-tight group-hover:scale-105 transition-transform">
           {letter.title}
@@ -483,7 +486,7 @@ export default function App() {
       {/* SHARED MODAL */}
       {openLetter && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.45)] px-4 py-8" onClick={closeModal}>
-          <div className="relative w-full max-w-2xl bg-[#fdf6ec]/95 border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_24px_40px_rgba(0,0,0,0.4)] text-[#3b2f2f] flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()} style={{backgroundImage: "radial-gradient(circle at 10% 10%, rgba(255,255,255,.6) 0%, rgba(0,0,0,0) 70%)"}}>
+          <div className="relative w-full max-w-2xl bg-[#f3e6f5] border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_24px_40px_rgba(0,0,0,0.4)] text-[#3b2f2f] flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
             
             {/* Header */}
             <div className="flex items-start justify-between gap-4 p-5 pb-3 border-b border-[rgba(182,159,131,0.3)]">
