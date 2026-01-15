@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase"; // Import auth from our updated file
 import {
   listenToLetters,
   addLetter as addLetterDB,
@@ -21,38 +23,28 @@ function getPreview(text, lines = 3) {
 function TinyRose() {
   return (
     <div className="absolute bottom-2 right-2 w-10 h-10 pointer-events-none select-none">
-      {/* back */}
       <div className="absolute left-[6px] bottom-[8px] w-5 h-5 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,210,215,1)_0%,rgba(180,70,90,0.35)_70%)] opacity-70 shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
-      {/* left */}
       <div className="absolute left-[2px] bottom-[6px] w-4 h-5 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,200,210,1)_0%,rgba(200,80,100,0.4)_70%)] rotate-[-20deg] opacity-90 shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
-      {/* right */}
       <div className="absolute right-[2px] bottom-[6px] w-4 h-5 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,205,215,1)_0%,rgba(180,60,80,0.4)_70%)] rotate-[20deg] opacity-90 shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
-      {/* front */}
       <div className="absolute left-[10px] bottom-[4px] w-4 h-5 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,220,225,1)_0%,rgba(220,100,120,0.45)_70%)] shadow-[0_2px_4px_rgba(0,0,0,0.2)]" />
-      {/* core */}
       <div className="absolute left-[12px] bottom-[10px] w-3 h-3 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,230,230,1)_0%,rgba(190,80,90,0.5)_70%)] border border-[rgba(180,70,80,0.4)] shadow-[0_1px_2px_rgba(0,0,0,0.4)]" />
     </div>
   );
 }
 
-/* ----- background clouds (tinted gray) + subtle texture ----- */
+/* ----- background clouds ----- */
 function SoftClouds() {
   return (
     <>
       <div className="pointer-events-none absolute inset-0 z-[1] overflow-hidden">
-        {/* top-left cluster */}
         <div className="absolute -top-20 -left-24 w-72 h-72 rounded-full bg-[rgba(110,110,110,0.18)] blur-[40px]" />
         <div className="absolute -top-10 left-16 w-56 h-56 rounded-full bg-[rgba(90,90,90,0.12)] blur-[50px]" />
         <div className="absolute top-10 -left-10 w-64 h-64 rounded-full bg-[rgba(70,70,70,0.08)] blur-[60px]" />
-        {/* bottom-right cluster */}
         <div className="absolute -bottom-24 -right-16 w-80 h-80 rounded-full bg-[rgba(80,80,80,0.15)] blur-[55px]" />
         <div className="absolute bottom-10 right-24 w-64 h-64 rounded-full bg-[rgba(60,60,60,0.10)] blur-[60px]" />
         <div className="absolute bottom-28 right-10 w-48 h-48 rounded-full bg-[rgba(40,40,40,0.07)] blur-[70px]" />
-        {/* faint center haze */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] rounded-full bg-[rgba(50,50,50,0.07)] blur-[80px]" />
       </div>
-
-      {/* paper-like noise/texture */}
       <div
         className="pointer-events-none absolute inset-0 z-[2] opacity-[.08] mix-blend-multiply"
         style={{
@@ -76,9 +68,7 @@ function LetterCard({ letter, onOpen, onToggleFavorite }) {
           "radial-gradient(circle at 10% 10%, rgba(255,255,255,.6) 0%, rgba(0,0,0,0) 70%)",
       }}
     >
-      {/* pin */}
       <div className="absolute -top-2 left-4 w-3 h-3 rounded-full bg-gradient-to-b from-yellow-200 to-yellow-600 border border-yellow-800/40 shadow-[0_2px_4px_rgba(0,0,0,0.4)]" />
-      {/* fav */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -97,7 +87,6 @@ function LetterCard({ letter, onOpen, onToggleFavorite }) {
           ♥
         </span>
       </button>
-      {/* content */}
       <div className="pr-8">
         <div className="text-[1.05rem] font-semibold leading-snug text-[#3b2f2f]">
           {letter.title}
@@ -112,7 +101,67 @@ function LetterCard({ letter, onOpen, onToggleFavorite }) {
   );
 }
 
+/* ----- LOGIN COMPONENT ----- */
+function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      console.error(err);
+      setError("Incorrect email or password.");
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#fdf6ec] text-[#3b2f2f] font-serif relative overflow-hidden">
+        <SoftClouds />
+        <div className="z-10 bg-white/60 p-8 rounded-xl border border-[#b69f83]/40 shadow-xl w-full max-w-sm text-center">
+            <h2 className="text-2xl mb-6 font-handwritten">Who goes there?</h2>
+            <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                <input 
+                    type="email" 
+                    placeholder="Email" 
+                    className="p-2 rounded border border-[#b69f83]/30 bg-white/80 focus:outline-none"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                />
+                <input 
+                    type="password" 
+                    placeholder="Password" 
+                    className="p-2 rounded border border-[#b69f83]/30 bg-white/80 focus:outline-none"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
+                <button type="submit" className="bg-[#3b2f2f] text-[#fdf6ec] py-2 rounded hover:bg-[#2a2222] transition">
+                    Unlock
+                </button>
+                {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
+            </form>
+        </div>
+    </div>
+  );
+}
+
+
+/* ----- MAIN APP ----- */
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // AUTH STATE LISTENER
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
   // letters (live from Firestore)
   const [letters, setLetters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -141,11 +190,13 @@ export default function App() {
   const [newCommentText, setNewCommentText] = useState("");
   const commentsUnsubRef = useRef(null);
 
-  // trash panel (kept for UI parity; no soft-delete here)
+  // trash panel
   const [showTrashPanel] = useState(false);
 
-  // subscribe letters
+  // subscribe letters ONLY if user is logged in
   useEffect(() => {
+    if (!user) return; // Do not fetch if not logged in
+
     const unsub = listenToLetters(
       (rows) => {
         setLetters(rows);
@@ -157,7 +208,11 @@ export default function App() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [user]); // Re-run when user logs in
+
+  // --- RENDERING LOGIC ---
+  if (authLoading) return <div className="min-h-screen bg-[#fdf6ec]" />;
+  if (!user) return <LoginScreen />;
 
   // filter
   const filteredLetters = letters.filter((l) => {
