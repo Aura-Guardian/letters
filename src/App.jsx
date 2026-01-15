@@ -7,6 +7,9 @@ import {
   updateLetter as updateLetterDB,
   deleteLetter as deleteLetterDB,
   toggleFavorite as toggleFavoriteDB,
+  listenToOpenWhen,
+  addOpenWhen as addOpenWhenDB,
+  deleteOpenWhen as deleteOpenWhenDB,
   createComment,
   listenToComments,
 } from "./firebase";
@@ -42,7 +45,6 @@ function SoftClouds() {
         <div className="absolute top-10 -left-10 w-64 h-64 rounded-full bg-[rgba(70,70,70,0.08)] blur-[60px]" />
         <div className="absolute -bottom-24 -right-16 w-80 h-80 rounded-full bg-[rgba(80,80,80,0.15)] blur-[55px]" />
         <div className="absolute bottom-10 right-24 w-64 h-64 rounded-full bg-[rgba(60,60,60,0.10)] blur-[60px]" />
-        <div className="absolute bottom-28 right-10 w-48 h-48 rounded-full bg-[rgba(40,40,40,0.07)] blur-[70px]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] rounded-full bg-[rgba(50,50,50,0.07)] blur-[80px]" />
       </div>
       <div
@@ -60,32 +62,21 @@ function SoftClouds() {
 /* ----- Letter Card ----- */
 function LetterCard({ letter, onOpen, onToggleFavorite }) {
   if (!letter) return null;
-  
   return (
     <div
       onClick={() => onOpen(letter)}
       className="relative cursor-pointer bg-[#fdf6ec]/90 border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_20px_30px_rgba(0,0,0,0.15)] p-4 transition-shadow hover:shadow-xl max-w-[260px]"
       style={{
-        backgroundImage:
-          "radial-gradient(circle at 10% 10%, rgba(255,255,255,.6) 0%, rgba(0,0,0,0) 70%)",
+        backgroundImage: "radial-gradient(circle at 10% 10%, rgba(255,255,255,.6) 0%, rgba(0,0,0,0) 70%)",
       }}
     >
       <div className="absolute -top-2 left-4 w-3 h-3 rounded-full bg-gradient-to-b from-yellow-200 to-yellow-600 border border-yellow-800/40 shadow-[0_2px_4px_rgba(0,0,0,0.4)]" />
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleFavorite(letter);
-        }}
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(letter); }}
         className="absolute top-3 right-3 text-lg leading-none"
         title="favorite"
       >
-        <span
-          className={
-            letter.favorite
-              ? "text-red-500 drop-shadow-[0_0_4px_rgba(255,0,0,0.4)]"
-              : "text-stone-400 hover:text-red-400"
-          }
-        >
+        <span className={letter.favorite ? "text-red-500 drop-shadow-[0_0_4px_rgba(255,0,0,0.4)]" : "text-stone-400 hover:text-red-400"}>
           ♥
         </span>
       </button>
@@ -99,6 +90,44 @@ function LetterCard({ letter, onOpen, onToggleFavorite }) {
         </div>
       </div>
       <TinyRose />
+    </div>
+  );
+}
+
+/* ----- Envelope Card (Open When) ----- */
+function EnvelopeCard({ letter, onOpen }) {
+  if (!letter) return null;
+  return (
+    <div 
+      onClick={() => onOpen(letter)}
+      className="group relative cursor-pointer w-full max-w-[280px] h-36 bg-[#fdf6ec] border border-[#b69f83] shadow-md hover:shadow-xl transition-all flex items-center justify-center rounded-sm"
+      style={{
+        backgroundImage: "repeating-linear-gradient(45deg, #fdf6ec 0, #fdf6ec 10px, #fffdf9 10px, #fffdf9 20px)"
+      }}
+    >
+      {/* Top Flap Triangle */}
+      <div 
+        className="absolute top-0 left-0 w-full h-full pointer-events-none"
+        style={{
+          background: "linear-gradient(to bottom right, transparent 50%, rgba(182,159,131,0.1) 50%), linear-gradient(to bottom left, transparent 50%, rgba(182,159,131,0.1) 50%)",
+          clipPath: "polygon(0 0, 100% 0, 50% 55%)",
+          backgroundColor: "rgba(255,255,255,0.4)"
+        }}
+      />
+      {/* Borders for flap definition */}
+      <div className="absolute top-0 left-0 w-full h-[55%] border-b border-[#b69f83]/30" 
+           style={{ clipPath: "polygon(0 0, 100% 0, 50% 100%)" }} />
+
+      {/* Wax Seal */}
+      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-red-800/80 rounded-full shadow-sm flex items-center justify-center text-white/90 text-xs border border-red-900">
+        ♥
+      </div>
+
+      <div className="z-20 px-6 pt-6 text-center">
+        <h3 className="text-[#3b2f2f] font-handwritten text-xl font-bold leading-tight group-hover:scale-105 transition-transform">
+          {letter.title}
+        </h3>
+      </div>
     </div>
   );
 }
@@ -153,12 +182,11 @@ function LoginScreen() {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  
-  // VIEW STATE: 'letters' or 'openwhen'
   const [view, setView] = useState("letters"); 
 
-  // letters
+  // Data
   const [letters, setLetters] = useState([]);
+  const [openWhens, setOpenWhens] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // filters
@@ -195,21 +223,27 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  // Fetch Letters
   useEffect(() => {
     if (!user) return; 
     const unsub = listenToLetters(
-      (rows) => {
-        setLetters(rows);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("letters listener error:", err);
-        setLoading(false);
-      }
+      (rows) => { setLetters(rows); setLoading(false); },
+      (err) => { console.error(err); setLoading(false); }
     );
     return () => unsub();
   }, [user]);
 
+  // Fetch Open Whens
+  useEffect(() => {
+    if (!user) return;
+    const unsub = listenToOpenWhen(
+      (rows) => setOpenWhens(rows),
+      (err) => console.error(err)
+    );
+    return () => unsub();
+  }, [user]);
+
+  // Typewriter
   useEffect(() => {
     if (!openLetter || isEditing) return;
     if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
@@ -228,27 +262,25 @@ export default function App() {
   const filteredLetters = letters.filter((l) => {
     if (!l) return false;
     const q = search.toLowerCase();
-    const title = l.title || "";
-    const date = l.date || "";
-    const body = l.body || "";
-    
-    const matches =
-      title.toLowerCase().includes(q) ||
-      date.toLowerCase().includes(q) ||
-      body.toLowerCase().includes(q);
-    const fav = showOnlyFavorites ? l.favorite : true;
-    return matches && fav;
+    const matches = (l.title||"").toLowerCase().includes(q) || (l.date||"").toLowerCase().includes(q) || (l.body||"").toLowerCase().includes(q);
+    return matches && (showOnlyFavorites ? l.favorite : true);
   });
 
-  async function addLetter() {
+  async function handleAdd() {
     if (!newTitle.trim() || !newBody.trim()) return;
-    await addLetterDB({ title: newTitle, date: newDate, body: newBody });
+    
+    if (view === "letters") {
+        await addLetterDB({ title: newTitle, date: newDate, body: newBody });
+    } else {
+        await addOpenWhenDB({ title: newTitle, body: newBody });
+    }
     setNewTitle("");
     setNewDate("");
     setNewBody("");
   }
 
   async function onToggleFavorite(letter) {
+    if (!letter.date) return; // Only letters have favorites
     try {
       await toggleFavoriteDB(letter.id, letter.favorite);
       if (openLetter?.id === letter.id) {
@@ -268,12 +300,15 @@ export default function App() {
     setNewCommentAuthor("");
     setNewCommentText("");
 
-    if (commentsUnsubRef.current) commentsUnsubRef.current();
-    commentsUnsubRef.current = listenToComments(
-      letter.id,
-      (rows) => setComments(rows),
-      (err) => console.error("comments subscribe error:", err)
-    );
+    // Only fetch comments if it has an ID (persisted letter)
+    if (letter.id) {
+        if (commentsUnsubRef.current) commentsUnsubRef.current();
+        commentsUnsubRef.current = listenToComments(
+        letter.id,
+        (rows) => setComments(rows),
+        (err) => console.error("comments subscribe error:", err)
+        );
+    }
   }
 
   function closeModal() {
@@ -289,20 +324,29 @@ export default function App() {
 
   async function saveEdits() {
     if (!openLetter) return;
-    const updates = {
-      title: editTitle.trim() || "(untitled)",
-      date: (editDate || "").trim(),
-      body: editBody.trim(),
-    };
-    await updateLetterDB(openLetter.id, updates);
-    setOpenLetter({ ...openLetter, ...updates });
+    // We only support editing "Letters" fully for now to keep it simple
+    if (openLetter.date !== undefined) {
+        const updates = {
+            title: editTitle.trim() || "(untitled)",
+            date: (editDate || "").trim(),
+            body: editBody.trim(),
+        };
+        await updateLetterDB(openLetter.id, updates);
+        setOpenLetter({ ...openLetter, ...updates });
+    } else {
+        alert("Editing Open When envelopes is not implemented yet. Delete and recreate if needed.");
+    }
     setIsEditing(false);
     setTypedText("");
   }
 
   async function removeLetter() {
     if (!openLetter) return;
-    await deleteLetterDB(openLetter.id);
+    if (openLetter.date !== undefined) {
+        await deleteLetterDB(openLetter.id);
+    } else {
+        await deleteOpenWhenDB(openLetter.id);
+    }
     closeModal();
   }
 
@@ -315,10 +359,7 @@ export default function App() {
         text: newCommentText,
       });
       setNewCommentText("");
-    } catch (e) {
-      console.error("add comment failed:", e);
-      alert("Could not add comment. Please try again.");
-    }
+    } catch (e) { console.error(e); }
   }
 
   // --- RENDERING ---
@@ -326,17 +367,8 @@ export default function App() {
   if (!user) return <LoginScreen />;
 
   return (
-    <div
-      className="relative min-h-screen bg-[#fdf6ec] text-[#3b2f2f] font-serif flex flex-col"
-      style={{
-        backgroundImage: `
-          radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4) 0%, rgba(0,0,0,0) 60%),
-          radial-gradient(circle at 80% 30%, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0) 60%),
-          radial-gradient(circle at 50% 80%, rgba(0,0,0,0.03) 0%, rgba(0,0,0,0) 70%)
-        `,
-        backgroundBlendMode: "screen",
-      }}
-    >
+    <div className="relative min-h-screen bg-[#fdf6ec] text-[#3b2f2f] font-serif flex flex-col"
+      style={{ backgroundImage: `radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4) 0%, rgba(0,0,0,0) 60%), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.25) 0%, rgba(0,0,0,0) 60%), radial-gradient(circle at 50% 80%, rgba(0,0,0,0.03) 0%, rgba(0,0,0,0) 70%)`, backgroundBlendMode: "screen" }}>
       <SoftClouds />
 
       <div className="relative z-10 flex-1 flex flex-col">
@@ -347,52 +379,21 @@ export default function App() {
               written with ink and heart ♡
             </div>
             
-            {/* NAVIGATION BUTTONS */}
             <div className="flex gap-4 mt-6 text-sm font-medium">
-                <button 
-                    onClick={() => setView("letters")}
-                    className={`px-4 py-1 rounded-full transition-colors border border-[#b69f83]/40 ${view === "letters" ? "bg-[#3b2f2f] text-[#fdf6ec]" : "bg-white/50 text-[#3b2f2f]/60 hover:bg-white/80"}`}
-                >
-                    Letters
-                </button>
-                <button 
-                    onClick={() => setView("openwhen")}
-                    className={`px-4 py-1 rounded-full transition-colors border border-[#b69f83]/40 ${view === "openwhen" ? "bg-[#3b2f2f] text-[#fdf6ec]" : "bg-white/50 text-[#3b2f2f]/60 hover:bg-white/80"}`}
-                >
-                    Open When...
-                </button>
+                <button onClick={() => setView("letters")} className={`px-4 py-1 rounded-full transition-colors border border-[#b69f83]/40 ${view === "letters" ? "bg-[#3b2f2f] text-[#fdf6ec]" : "bg-white/50 text-[#3b2f2f]/60 hover:bg-white/80"}`}>Letters</button>
+                <button onClick={() => setView("openwhen")} className={`px-4 py-1 rounded-full transition-colors border border-[#b69f83]/40 ${view === "openwhen" ? "bg-[#3b2f2f] text-[#fdf6ec]" : "bg-white/50 text-[#3b2f2f]/60 hover:bg-white/80"}`}>Open When...</button>
             </div>
           </div>
 
-          {/* SEARCH & FILTERS (Only show if on "Letters" view) */}
           {view === "letters" && (
             <div className="flex flex-wrap justify-center gap-6 text-[#3b2f2f] text-sm">
                 <div className="flex flex-col items-start text-left">
-                <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">
-                    search by title / date / words
-                </label>
-                <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="e.g. friday, 2025-10, smile"
-                    className="bg-[#fdf6ec]/80 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)] placeholder:text-[rgba(182,159,131,0.6)]"
-                />
+                    <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">search</label>
+                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="search..." className="bg-[#fdf6ec]/80 border border-[#b69f83]/40 rounded px-2 py-1 text-sm focus:outline-none" />
                 </div>
-
                 <div className="flex flex-col items-start text-left">
-                <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">
-                    show only pinned favorites
-                </label>
-                <button
-                    onClick={() => setShowOnlyFavorites((v) => !v)}
-                    className={`px-3 py-1 rounded text-sm border border-[rgba(182,159,131,0.4)] shadow ${
-                    showOnlyFavorites
-                        ? "bg-red-100 text-red-600 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)]"
-                        : "bg-[#fdf6ec]/80 text-[#3b2f2f] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)]"
-                    }`}
-                >
-                    {showOnlyFavorites ? "♥ only" : "all"}
-                </button>
+                    <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">filter</label>
+                    <button onClick={() => setShowOnlyFavorites((v) => !v)} className={`px-3 py-1 rounded text-sm border border-[#b69f83]/40 ${showOnlyFavorites ? "bg-red-100 text-red-600" : "bg-[#fdf6ec]/80"}`}>{showOnlyFavorites ? "♥ only" : "all"}</button>
                 </div>
             </div>
           )}
@@ -400,196 +401,120 @@ export default function App() {
 
         {/* MAIN CONTENT AREA */}
         <main className="w-full max-w-6xl mx-auto px-4 pb-24">
-            
-            {/* VIEW: LETTERS */}
-            {view === "letters" && (
-                <div className="flex flex-col lg:flex-row gap-10">
-                    {/* grid */}
-                    <section className="flex-1 min-w-0">
-                        {loading ? (
+            <div className="flex flex-col lg:flex-row gap-10">
+                
+                {/* GRID SECTION */}
+                <section className="flex-1 min-w-0">
+                    {loading ? (
                         <div className="text-sm text-[#3b2f2f]/60 italic">loading…</div>
-                        ) : (
-                        <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-3">
-                            {filteredLetters.length === 0 ? (
-                            <div className="text-sm text-[#3b2f2f]/60 italic">
-                                nothing matches that search yet.
-                            </div>
+                    ) : (
+                        <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-3 justify-items-center">
+                            {view === "letters" ? (
+                                filteredLetters.map((l) => (
+                                    <LetterCard key={l.id} letter={l} onOpen={openModal} onToggleFavorite={onToggleFavorite} />
+                                ))
                             ) : (
-                            filteredLetters.map((l) => (
-                                <LetterCard
-                                key={l.id}
-                                letter={l}
-                                onOpen={openModal}
-                                onToggleFavorite={onToggleFavorite}
-                                />
-                            ))
+                                openWhens.map((l) => (
+                                    <EnvelopeCard key={l.id} letter={l} onOpen={openModal} />
+                                ))
                             )}
+                            
+                            {/* Empty state messages */}
+                            {view === "letters" && filteredLetters.length === 0 && <div className="col-span-full text-sm italic text-stone-400">nothing here yet.</div>}
+                            {view === "openwhen" && openWhens.length === 0 && <div className="col-span-full text-sm italic text-stone-400">no envelopes sealed yet.</div>}
                         </div>
-                        )}
-                    </section>
+                    )}
+                </section>
 
-                    {/* compose sidebar */}
-                    <aside className="w-full lg:w-[320px] flex-shrink-0 bg-[#fdf6ec]/90 border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_20px_30px_rgba(0,0,0,0.15)] p-4 h-fit">
-                        <div className="text-lg font-semibold text-[#3b2f2f] mb-2 leading-none font-handwritten">
-                        write a new letter
-                        </div>
-                        <div className="text-[0.75rem] text-[#3b2f2f]/70 mb-4 leading-snug">
-                        where our memories find their forever
-                        </div>
-
-                        <label className="block text-xs text-[#3b2f2f]/70 mb-1">title</label>
-                        <input
-                        className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
+                {/* COMPOSER SIDEBAR */}
+                <aside className="w-full lg:w-[320px] flex-shrink-0 bg-[#fdf6ec]/90 border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_20px_30px_rgba(0,0,0,0.15)] p-4 h-fit">
+                    <div className="text-lg font-semibold text-[#3b2f2f] mb-2 leading-none font-handwritten">
+                        {view === "letters" ? "write a new letter" : "seal a new envelope"}
+                    </div>
+                    
+                    <label className="block text-xs text-[#3b2f2f]/70 mb-1">
+                        {view === "letters" ? "title" : "open when..."}
+                    </label>
+                    <input
+                        className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm focus:outline-none"
                         value={newTitle}
                         onChange={(e) => setNewTitle(e.target.value)}
-                        placeholder="do you remember?"
-                        />
+                        placeholder={view === "letters" ? "do you remember?" : "e.g. you're sad"}
+                    />
 
+                    {view === "letters" && (
+                        <>
                         <label className="block text-xs text-[#3b2f2f]/70 mb-1">date</label>
                         <input
-                        className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
-                        value={newDate}
-                        onChange={(e) => setNewDate(e.target.value)}
-                        placeholder="YYYY-MM-DD"
+                            className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm focus:outline-none"
+                            value={newDate}
+                            onChange={(e) => setNewDate(e.target.value)}
+                            placeholder="YYYY-MM-DD"
                         />
+                        </>
+                    )}
 
-                        <label className="block text-xs text-[#3b2f2f]/70 mb-1">body</label>
-                        <textarea
-                        className="w-full h-32 resize-none mb-4 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm leading-relaxed shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
+                    <label className="block text-xs text-[#3b2f2f]/70 mb-1">
+                        {view === "letters" ? "body" : "content inside"}
+                    </label>
+                    <textarea
+                        className="w-full h-32 resize-none mb-4 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm leading-relaxed focus:outline-none"
                         value={newBody}
                         onChange={(e) => setNewBody(e.target.value)}
                         placeholder="write like always..."
-                        />
+                    />
 
-                        <button
-                        onClick={addLetter}
+                    <button
+                        onClick={handleAdd}
                         className="w-full text-center text-sm font-medium bg-[#3b2f2f] text-[#fdf6ec] rounded py-2 shadow hover:shadow-xl transition-shadow"
-                        >
-                        add to board
-                        </button>
-                    </aside>
-                </div>
-            )}
-
-            {/* VIEW: OPEN WHEN (Placeholder) */}
-            {view === "openwhen" && (
-                <div className="w-full min-h-[50vh] flex flex-col items-center justify-center gap-4 text-[#3b2f2f]/60 animate-in fade-in duration-500">
-                    <div className="text-4xl">💌</div>
-                    <div className="italic text-lg">matrix of envelopes appearing soon...</div>
-                </div>
-            )}
+                    >
+                        {view === "letters" ? "add to board" : "seal envelope"}
+                    </button>
+                </aside>
+            </div>
         </main>
       </div>
 
       {/* SHARED MODAL */}
       {openLetter && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.45)] px-4 py-8"
-          onClick={closeModal}
-        >
-          <div
-            className="relative w-full max-w-2xl bg-[#fdf6ec]/95 border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_24px_40px_rgba(0,0,0,0.4)] text-[#3b2f2f] flex flex-col max-h-[85vh]"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle at 10% 10%, rgba(255,255,255,.6) 0%, rgba(0,0,0,0) 70%)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* HEADER */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.45)] px-4 py-8" onClick={closeModal}>
+          <div className="relative w-full max-w-2xl bg-[#fdf6ec]/95 border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_24px_40px_rgba(0,0,0,0.4)] text-[#3b2f2f] flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()} style={{backgroundImage: "radial-gradient(circle at 10% 10%, rgba(255,255,255,.6) 0%, rgba(0,0,0,0) 70%)"}}>
+            
+            {/* Header */}
             <div className="flex items-start justify-between gap-4 p-5 pb-3 border-b border-[rgba(182,159,131,0.3)]">
               <div className="flex-1 min-w-0">
                 {isEditing ? (
                   <>
-                    <input
-                      className="w-full mb-2 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)] font-semibold"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                    />
-                    <input
-                      className="w-full bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-[0.7rem] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)] text-[#3b2f2f]/60"
-                      value={editDate}
-                      onChange={(e) => setEditDate(e.target.value)}
-                      placeholder="YYYY-MM-DD"
-                    />
+                    <input className="w-full mb-2 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 font-semibold" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                    {openLetter.date !== undefined && <input className="w-full bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-xs" value={editDate} onChange={(e) => setEditDate(e.target.value)} />}
                   </>
                 ) : (
                   <>
-                    <div className="text-lg font-semibold leading-tight break-words">
-                      {openLetter.title}
-                    </div>
+                    <div className="text-lg font-semibold leading-tight break-words">{openLetter.title}</div>
                     <div className="text-[0.7rem] text-[#3b2f2f]/60">{openLetter.date}</div>
                   </>
                 )}
               </div>
-
-              {/* action cluster */}
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onToggleFavorite(openLetter)}
-                  className="px-3 py-1 rounded bg-[#fdf6ec] border border-[rgba(182,159,131,0.5)] text-sm shadow hover:shadow-lg"
-                  title="favorite"
-                >
-                  {openLetter.favorite ? "♥" : "♡"}
-                </button>
-
                 {!isEditing ? (
                   <>
-                    <button
-                      onClick={() => {
-                        setIsEditing(true);
-                        setTypedText("");
-                      }}
-                      className="px-3 py-1 rounded bg-[#fdf6ec] border border-[rgba(182,159,131,0.5)] text-sm shadow hover:shadow-lg"
-                    >
-                      edit
-                    </button>
-                    <button
-                      onClick={removeLetter}
-                      className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-sm shadow hover:shadow-lg"
-                    >
-                      delete
-                    </button>
+                    {openLetter.date !== undefined && <button onClick={() => { setIsEditing(true); setTypedText(""); }} className="px-3 py-1 rounded bg-[#fdf6ec] border border-[#b69f83]/50 text-sm shadow">edit</button>}
+                    <button onClick={removeLetter} className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-sm shadow">delete</button>
                   </>
                 ) : (
                   <>
-                    <button
-                      onClick={saveEdits}
-                      className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-sm shadow hover:shadow-lg"
-                    >
-                      save
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsEditing(false);
-                        setEditTitle(openLetter.title);
-                        setEditDate(openLetter.date || "");
-                        setEditBody(openLetter.body);
-                        setTypedText("");
-                      }}
-                      className="px-3 py-1 rounded bg-[#fdf6ec] border border-[rgba(182,159,131,0.5)] text-sm shadow hover:shadow-lg"
-                    >
-                      cancel
-                    </button>
+                    <button onClick={saveEdits} className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-sm shadow">save</button>
+                    <button onClick={() => setIsEditing(false)} className="px-3 py-1 rounded bg-[#fdf6ec] border border-[#b69f83]/50 text-sm shadow">cancel</button>
                   </>
                 )}
-
-                <button
-                  onClick={closeModal}
-                  className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-sm shadow hover:shadow-lg"
-                >
-                  close
-                </button>
+                <button onClick={closeModal} className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-sm shadow">close</button>
               </div>
             </div>
 
-            {/* BODY */}
+            {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 py-4 text-sm leading-relaxed font-[400] text-[#3b2f2f] whitespace-pre-line">
               {isEditing ? (
-                <textarea
-                  className="w-full h-full min-h-[10rem] resize-none bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm leading-relaxed shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
-                  value={editBody}
-                  onChange={(e) => setEditBody(e.target.value)}
-                />
+                <textarea className="w-full h-full min-h-[10rem] bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1" value={editBody} onChange={(e) => setEditBody(e.target.value)} />
               ) : (
                 <>
                   {typedText}
@@ -598,52 +523,22 @@ export default function App() {
               )}
             </div>
 
-            {/* COMMENTS */}
+            {/* Comments */}
             <div className="border-t border-[rgba(182,159,131,0.3)] px-5 py-3">
-              <div className="text-[0.75rem] text-[#3b2f2f]/70 mb-2">
-                notes back to this letter:
-              </div>
-              {comments.length === 0 ? (
-                <div className="text-[0.75rem] italic text-[#3b2f2f]/50 mb-3">
-                  no replies yet.
-                </div>
-              ) : (
-                <ul className="space-y-2 mb-3 max-h-40 overflow-y-auto pr-1">
+              <div className="text-[0.75rem] text-[#3b2f2f]/70 mb-2">notes back to this letter:</div>
+              <ul className="space-y-2 mb-3 max-h-40 overflow-y-auto pr-1">
                   {comments.map((c) => (
                     <li key={c.id} className="text-sm">
-                      <span className="font-semibold">{c.author || "someone"}</span>
-                      <span className="text-[#3b2f2f]/70"> — </span>
-                      <span>{c.text}</span>
+                      <span className="font-semibold">{c.author || "someone"}</span> <span className="text-[#3b2f2f]/70">—</span> {c.text}
                     </li>
                   ))}
-                </ul>
-              )}
-
+              </ul>
               <div className="flex flex-col gap-2">
-                <input
-                  className="bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm"
-                  placeholder="your name"
-                  value={newCommentAuthor}
-                  onChange={(e) => setNewCommentAuthor(e.target.value)}
-                />
+                <input className="bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm" placeholder="your name" value={newCommentAuthor} onChange={(e) => setNewCommentAuthor(e.target.value)} />
                 <div className="flex gap-2">
-                  <input
-                    className="flex-1 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm"
-                    placeholder="write back to this letter..."
-                    value={newCommentText}
-                    onChange={(e) => setNewCommentText(e.target.value)}
-                  />
-                  <button
-                    onClick={handleAddComment}
-                    className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-xs shadow hover:shadow-lg"
-                  >
-                    add
-                  </button>
+                  <input className="flex-1 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm" placeholder="write back..." value={newCommentText} onChange={(e) => setNewCommentText(e.target.value)} />
+                  <button onClick={handleAddComment} className="px-3 py-1 rounded bg-[#3b2f2f] text-[#fdf6ec] text-xs shadow">add</button>
                 </div>
-              </div>
-
-              <div className="text-[0.7rem] text-[#3b2f2f]/60 mt-3 italic">
-                just for you, my muse.
               </div>
             </div>
           </div>
