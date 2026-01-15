@@ -1,6 +1,6 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth"; // Import Auth
+import { getAuth } from "firebase/auth"; 
 import {
   getFirestore,
   collection,
@@ -26,7 +26,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export const auth = getAuth(app); // Export Auth
+export const auth = getAuth(app);
 
 // ---------- LETTERS ----------
 export function listenToLetters(callback, onError) {
@@ -45,8 +45,7 @@ export function listenToLetters(callback, onError) {
 }
 
 export async function addLetter({ title, date, body }) {
-  const col = collection(db, "letters");
-  await addDoc(col, {
+  await addDoc(collection(db, "letters"), {
     title: title.trim(),
     date: (date || "").trim() || new Date().toISOString().slice(0, 10),
     body: body.trim(),
@@ -56,24 +55,42 @@ export async function addLetter({ title, date, body }) {
 }
 
 export async function updateLetter(id, updates) {
-  const ref = doc(db, "letters", id);
-  await updateDoc(ref, updates);
+  await updateDoc(doc(db, "letters", id), updates);
 }
 
 export async function toggleFavorite(id, current) {
-  const ref = doc(db, "letters", id);
-  await updateDoc(ref, { favorite: !current });
+  await updateDoc(doc(db, "letters", id), { favorite: !current });
 }
 
 export async function deleteLetter(id) {
-  const ref = doc(db, "letters", id);
-  await deleteDoc(ref);
+  await deleteDoc(doc(db, "letters", id));
+}
+
+// ---------- OPEN WHEN (NEW) ----------
+export function listenToOpenWhen(callback, onError) {
+  const q = query(collection(db, "open_when"), orderBy("createdAt", "desc"));
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => onError?.(err)
+  );
+}
+
+export async function addOpenWhen({ title, body }) {
+  await addDoc(collection(db, "open_when"), {
+    title: title.trim(), 
+    body: body.trim(),
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function deleteOpenWhen(id) {
+  await deleteDoc(doc(db, "open_when", id));
 }
 
 // ---------- COMMENTS ----------
 export async function createComment({ letterId, author, text }) {
-  const col = collection(db, "comments");
-  await addDoc(col, {
+  await addDoc(collection(db, "comments"), {
     letterId,
     author: author?.trim() || "someone",
     text: text.trim(),
@@ -87,11 +104,7 @@ export function listenToComments(letterId, callback, onError) {
     q,
     (snap) => {
       const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      rows.sort((a, b) => {
-        const ta = a.createdAt?.toMillis?.() ?? 0;
-        const tb = b.createdAt?.toMillis?.() ?? 0;
-        return ta - tb;
-      });
+      rows.sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0));
       callback(rows);
     },
     (err) => onError?.(err)
