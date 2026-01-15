@@ -59,7 +59,7 @@ function SoftClouds() {
 
 /* ----- Letter Card ----- */
 function LetterCard({ letter, onOpen, onToggleFavorite }) {
-  if (!letter) return null; // Safety check
+  if (!letter) return null;
   
   return (
     <div
@@ -104,7 +104,7 @@ function LetterCard({ letter, onOpen, onToggleFavorite }) {
 }
 
 /* ----- LOGIN COMPONENT ----- */
-function LoginScreen({ onLogin }) { // Helper component logic moved inside
+function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -151,9 +151,11 @@ function LoginScreen({ onLogin }) { // Helper component logic moved inside
 
 /* ----- MAIN APP ----- */
 export default function App() {
-  // 1. ALL HOOKS MUST BE DECLARED AT THE TOP
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  
+  // VIEW STATE: 'letters' or 'openwhen'
+  const [view, setView] = useState("letters"); 
 
   // letters
   const [letters, setLetters] = useState([]);
@@ -185,8 +187,6 @@ export default function App() {
   const commentsUnsubRef = useRef(null);
 
   // --- USE EFFECTS ---
-
-  // Auth Listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -195,10 +195,8 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Letters Listener (only runs if user exists)
   useEffect(() => {
     if (!user) return; 
-
     const unsub = listenToLetters(
       (rows) => {
         setLetters(rows);
@@ -212,7 +210,6 @@ export default function App() {
     return () => unsub();
   }, [user]);
 
-  // Typewriter effect (MOVED UP HERE so it's not after a return)
   useEffect(() => {
     if (!openLetter || isEditing) return;
     if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
@@ -227,9 +224,7 @@ export default function App() {
   }, [openLetter, isEditing]);
 
 
-  // --- HELPER FUNCTIONS ---
-
-  // filter
+  // --- HELPERS ---
   const filteredLetters = letters.filter((l) => {
     if (!l) return false;
     const q = search.toLowerCase();
@@ -259,9 +254,7 @@ export default function App() {
       if (openLetter?.id === letter.id) {
         setOpenLetter({ ...openLetter, favorite: !openLetter.favorite });
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   }
 
   function openModal(letter) {
@@ -329,7 +322,6 @@ export default function App() {
   }
 
   // --- RENDERING ---
-  // Returns happen LAST
   if (authLoading) return <div className="min-h-screen bg-[#fdf6ec]" />;
   if (!user) return <LoginScreen />;
 
@@ -354,125 +346,142 @@ export default function App() {
             <div className="text-2xl font-semibold text-[#3b2f2f] leading-none font-handwritten">
               written with ink and heart ♡
             </div>
-            <div className="text-[0.8rem] text-[#3b2f2f]/70 mt-2 italic">
-              a sanctuary for all we are
+            
+            {/* NAVIGATION BUTTONS */}
+            <div className="flex gap-4 mt-6 text-sm font-medium">
+                <button 
+                    onClick={() => setView("letters")}
+                    className={`px-4 py-1 rounded-full transition-colors border border-[#b69f83]/40 ${view === "letters" ? "bg-[#3b2f2f] text-[#fdf6ec]" : "bg-white/50 text-[#3b2f2f]/60 hover:bg-white/80"}`}
+                >
+                    Letters
+                </button>
+                <button 
+                    onClick={() => setView("openwhen")}
+                    className={`px-4 py-1 rounded-full transition-colors border border-[#b69f83]/40 ${view === "openwhen" ? "bg-[#3b2f2f] text-[#fdf6ec]" : "bg-white/50 text-[#3b2f2f]/60 hover:bg-white/80"}`}
+                >
+                    Open When...
+                </button>
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-6 text-[#3b2f2f] text-sm">
-            <div className="flex flex-col items-start text-left">
-              <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">
-                search by title / date / words
-              </label>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="e.g. friday, 2025-10, smile"
-                className="bg-[#fdf6ec]/80 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)] placeholder:text-[rgba(182,159,131,0.6)]"
-              />
-            </div>
+          {/* SEARCH & FILTERS (Only show if on "Letters" view) */}
+          {view === "letters" && (
+            <div className="flex flex-wrap justify-center gap-6 text-[#3b2f2f] text-sm">
+                <div className="flex flex-col items-start text-left">
+                <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">
+                    search by title / date / words
+                </label>
+                <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="e.g. friday, 2025-10, smile"
+                    className="bg-[#fdf6ec]/80 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)] placeholder:text-[rgba(182,159,131,0.6)]"
+                />
+                </div>
 
-            <div className="flex flex-col items-start text-left">
-              <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">
-                show only pinned favorites
-              </label>
-              <button
-                onClick={() => setShowOnlyFavorites((v) => !v)}
-                className={`px-3 py-1 rounded text-sm border border-[rgba(182,159,131,0.4)] shadow ${
-                  showOnlyFavorites
-                    ? "bg-red-100 text-red-600 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)]"
-                    : "bg-[#fdf6ec]/80 text-[#3b2f2f] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)]"
-                }`}
-              >
-                {showOnlyFavorites ? "♥ only" : "all"}
-              </button>
+                <div className="flex flex-col items-start text-left">
+                <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">
+                    show only pinned favorites
+                </label>
+                <button
+                    onClick={() => setShowOnlyFavorites((v) => !v)}
+                    className={`px-3 py-1 rounded text-sm border border-[rgba(182,159,131,0.4)] shadow ${
+                    showOnlyFavorites
+                        ? "bg-red-100 text-red-600 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)]"
+                        : "bg-[#fdf6ec]/80 text-[#3b2f2f] shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)]"
+                    }`}
+                >
+                    {showOnlyFavorites ? "♥ only" : "all"}
+                </button>
+                </div>
             </div>
-
-            {/* trash panel restored toggle */}
-            <div className="hidden" />
-
-            <div className="flex flex-col items-start text-left opacity-50 cursor-not-allowed">
-              <label className="text-[0.7rem] text-[#3b2f2f]/70 mb-1">typing sound</label>
-              <button
-                className="px-3 py-1 rounded text-sm border border-[rgba(182,159,131,0.4)] bg-[#fdf6ec]/40 text-[#3b2f2f]/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)]"
-                disabled
-              >
-                off
-              </button>
-            </div>
-          </div>
+          )}
         </header>
 
-        {/* MAIN */}
-        <main className="w-full max-w-6xl flex flex-col lg:flex-row gap-10 mx-auto px-4 pb-24">
-          {/* grid */}
-          <section className="flex-1 min-w-0">
-            {loading ? (
-              <div className="text-sm text-[#3b2f2f]/60 italic">loading…</div>
-            ) : (
-              <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredLetters.length === 0 ? (
-                  <div className="text-sm text-[#3b2f2f]/60 italic">
-                    nothing matches that search yet.
-                  </div>
-                ) : (
-                  filteredLetters.map((l) => (
-                    <LetterCard
-                      key={l.id}
-                      letter={l}
-                      onOpen={openModal}
-                      onToggleFavorite={onToggleFavorite}
-                    />
-                  ))
-                )}
-              </div>
+        {/* MAIN CONTENT AREA */}
+        <main className="w-full max-w-6xl mx-auto px-4 pb-24">
+            
+            {/* VIEW: LETTERS */}
+            {view === "letters" && (
+                <div className="flex flex-col lg:flex-row gap-10">
+                    {/* grid */}
+                    <section className="flex-1 min-w-0">
+                        {loading ? (
+                        <div className="text-sm text-[#3b2f2f]/60 italic">loading…</div>
+                        ) : (
+                        <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-3">
+                            {filteredLetters.length === 0 ? (
+                            <div className="text-sm text-[#3b2f2f]/60 italic">
+                                nothing matches that search yet.
+                            </div>
+                            ) : (
+                            filteredLetters.map((l) => (
+                                <LetterCard
+                                key={l.id}
+                                letter={l}
+                                onOpen={openModal}
+                                onToggleFavorite={onToggleFavorite}
+                                />
+                            ))
+                            )}
+                        </div>
+                        )}
+                    </section>
+
+                    {/* compose sidebar */}
+                    <aside className="w-full lg:w-[320px] flex-shrink-0 bg-[#fdf6ec]/90 border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_20px_30px_rgba(0,0,0,0.15)] p-4 h-fit">
+                        <div className="text-lg font-semibold text-[#3b2f2f] mb-2 leading-none font-handwritten">
+                        write a new letter
+                        </div>
+                        <div className="text-[0.75rem] text-[#3b2f2f]/70 mb-4 leading-snug">
+                        where our memories find their forever
+                        </div>
+
+                        <label className="block text-xs text-[#3b2f2f]/70 mb-1">title</label>
+                        <input
+                        className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                        placeholder="do you remember?"
+                        />
+
+                        <label className="block text-xs text-[#3b2f2f]/70 mb-1">date</label>
+                        <input
+                        className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
+                        value={newDate}
+                        onChange={(e) => setNewDate(e.target.value)}
+                        placeholder="YYYY-MM-DD"
+                        />
+
+                        <label className="block text-xs text-[#3b2f2f]/70 mb-1">body</label>
+                        <textarea
+                        className="w-full h-32 resize-none mb-4 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm leading-relaxed shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
+                        value={newBody}
+                        onChange={(e) => setNewBody(e.target.value)}
+                        placeholder="write like always..."
+                        />
+
+                        <button
+                        onClick={addLetter}
+                        className="w-full text-center text-sm font-medium bg-[#3b2f2f] text-[#fdf6ec] rounded py-2 shadow hover:shadow-xl transition-shadow"
+                        >
+                        add to board
+                        </button>
+                    </aside>
+                </div>
             )}
-          </section>
 
-          {/* compose */}
-          <aside className="w-full lg:w-[320px] flex-shrink-0 bg-[#fdf6ec]/90 border border-[rgba(182,159,131,0.4)] rounded-xl shadow-[0_20px_30px_rgba(0,0,0,0.15)] p-4 h-fit">
-            <div className="text-lg font-semibold text-[#3b2f2f] mb-2 leading-none font-handwritten">
-              write a new letter
-            </div>
-            <div className="text-[0.75rem] text-[#3b2f2f]/70 mb-4 leading-snug">
-              where our memories find their forever
-            </div>
-
-            <label className="block text-xs text-[#3b2f2f]/70 mb-1">title</label>
-            <input
-              className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="do you remember?"
-            />
-
-            <label className="block text-xs text-[#3b2f2f]/70 mb-1">date</label>
-            <input
-              className="w-full mb-3 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              placeholder="YYYY-MM-DD"
-            />
-
-            <label className="block text-xs text-[#3b2f2f]/70 mb-1">body</label>
-            <textarea
-              className="w-full h-32 resize-none mb-4 bg-white/70 border border-[rgba(182,159,131,0.4)] rounded px-2 py-1 text-sm leading-relaxed shadow-[inset_0_1px_2px_rgba(255,255,255,0.4),inset_0_-1px_4px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-1 focus:ring-[rgba(182,159,131,0.4)]"
-              value={newBody}
-              onChange={(e) => setNewBody(e.target.value)}
-              placeholder="write like always..."
-            />
-
-            <button
-              onClick={addLetter}
-              className="w-full text-center text-sm font-medium bg-[#3b2f2f] text-[#fdf6ec] rounded py-2 shadow hover:shadow-xl transition-shadow"
-            >
-              add to board
-            </button>
-          </aside>
+            {/* VIEW: OPEN WHEN (Placeholder) */}
+            {view === "openwhen" && (
+                <div className="w-full min-h-[50vh] flex flex-col items-center justify-center gap-4 text-[#3b2f2f]/60 animate-in fade-in duration-500">
+                    <div className="text-4xl">💌</div>
+                    <div className="italic text-lg">matrix of envelopes appearing soon...</div>
+                </div>
+            )}
         </main>
       </div>
 
-      {/* MODAL */}
+      {/* SHARED MODAL */}
       {openLetter && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.45)] px-4 py-8"
