@@ -97,14 +97,17 @@ function LetterCard({ letter, onOpen, onToggleFavorite }) {
 }
 
 /* ----- Envelope Card (Open When) ----- */
+/* ----- Envelope Card (Open When) ----- */
 function EnvelopeCard({ letter, onOpen }) {
   if (!letter) return null;
   return (
     <div 
       onClick={() => onOpen(letter)}
-      className="group relative cursor-pointer w-full max-w-[280px] h-36 border border-[#dcd0ff] shadow-md hover:shadow-xl transition-all flex items-center justify-center rounded-sm"
+      // 1. Made bigger: max-w-[340px] and h-52 (Height increased significantly)
+      // 2. Changed alignment: items-end (Aligns text to bottom so it doesn't hit the seal)
+      // 3. Added padding bottom: pb-8
+      className="group relative cursor-pointer w-full max-w-[340px] h-52 border border-[#dcd0ff] shadow-sm hover:shadow-xl transition-all flex items-end justify-center rounded-sm pb-8"
       style={{
-        // Lavender Base + Canvas Texture
         backgroundColor: "#f3e6f5",
         backgroundImage: `linear-gradient(90deg, rgba(59, 47, 47, 0.03) 50%, transparent 50%), linear-gradient(rgba(59, 47, 47, 0.03) 50%, transparent 50%)`,
         backgroundSize: "4px 4px"
@@ -115,6 +118,7 @@ function EnvelopeCard({ letter, onOpen }) {
         className="absolute top-0 left-0 w-full h-full pointer-events-none"
         style={{
           background: "linear-gradient(to bottom right, transparent 50%, rgba(100, 80, 100, 0.05) 50%), linear-gradient(to bottom left, transparent 50%, rgba(100, 80, 100, 0.05) 50%)",
+          // Flap covers ~55% of the envelope height
           clipPath: "polygon(0 0, 100% 0, 50% 55%)",
           backgroundColor: "rgba(255,255,255,0.3)"
         }}
@@ -128,7 +132,8 @@ function EnvelopeCard({ letter, onOpen }) {
       </div>
 
       {/* Title */}
-      <div className="z-20 px-6 pt-12 text-center">
+      {/* Removed top padding. Now it just sits comfortably at the bottom. */}
+      <div className="z-20 px-8 text-center">
         <h3 className="text-[#3b2f2f] font-handwritten text-xl font-bold leading-tight group-hover:scale-105 transition-transform">
           {letter.title}
         </h3>
@@ -136,7 +141,6 @@ function EnvelopeCard({ letter, onOpen }) {
     </div>
   );
 }
-
 /* ----- LOGIN COMPONENT ----- */
 function LoginScreen() {
   const [email, setEmail] = useState("");
